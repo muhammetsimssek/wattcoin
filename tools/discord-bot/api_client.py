@@ -37,6 +37,26 @@ class WattCoinAPI:
     async def get_leaderboard(self):
         return await self._make_request("leaderboard")
 
+    async def get_alerts(self):
+        """
+        Polls multiple endpoints to synthesize an 'activity' feed.
+        Since /recent-activity doesn't exist, we'll check /bounties for now.
+        """
+        bounties = await self.get_bounties()
+        if not bounties:
+            return []
+        
+        # Convert bounties to activity format
+        activities = []
+        for b in bounties:
+            activities.append({
+                'id': f"bounty-{b.get('number')}",
+                'type': 'NEW_BOUNTY',
+                'description': f"**New Bounty:** {b.get('title')}\n**Reward:** {b.get('reward')} WATT",
+                'url': b.get('url')
+            })
+        return activities
+
 class DexScreenerAPI:
     async def get_price(self):
         url = f"https://api.dexscreener.com/latest/dex/tokens/{WATT_MINT_ADDRESS}"

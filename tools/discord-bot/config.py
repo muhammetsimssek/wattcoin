@@ -4,6 +4,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+DISCORD_ALERTS_CHANNEL = os.getenv("DISCORD_ALERTS_CHANNEL")
+if DISCORD_ALERTS_CHANNEL:
+    DISCORD_ALERTS_CHANNEL = int(DISCORD_ALERTS_CHANNEL)
+
 WATTCOIN_API_URL = os.getenv("WATTCOIN_API_URL", "https://api.wattcoin.org/api/v1")
 SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
 WATT_MINT_ADDRESS = os.getenv("WATT_MINT_ADDRESS", "Gpmbh4PoQnL1kNgpMYDED3iv4fczcr7d3qNBLf8rpump")

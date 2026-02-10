@@ -806,7 +806,17 @@ DASHBOARD_TEMPLATE = """
         </div>
         
         <!-- PR List -->
-        <h2 class="text-xl font-semibold mb-4">Open Pull Requests</h2>
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">Open Pull Requests</h2>
+            {% if prs %}
+            <form method="POST" action="{{ url_for('admin.close_all_prs') }}"
+                  onsubmit="return confirm('Close ALL {{ prs|length }} open PRs?')">
+                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition text-sm">
+                    ❌ Close All ({{ prs|length }})
+                </button>
+            </form>
+            {% endif %}
+        </div>
         
         {% if prs %}
         <div class="space-y-4">
@@ -847,6 +857,12 @@ DASHBOARD_TEMPLATE = """
                            class="px-4 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
                             View
                         </a>
+                        <form method="POST" action="{{ url_for('admin.close_pr_route', pr_number=pr.number) }}" 
+                              onsubmit="return confirm('Close PR #{{ pr.number }}?')" class="inline">
+                            <button type="submit" class="px-4 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition">
+                                Close
+                            </button>
+                        </form>
                     </div>
                 </div>
                 {% if pr.number|string in reviews and reviews[pr.number|string].get('feedback') %}
@@ -1928,7 +1944,7 @@ API_KEYS_TEMPLATE = """
         <div class="mt-4 p-4 bg-gray-800 rounded-lg">
             <p class="text-sm text-gray-400 mb-2"><strong>User Usage (share with key recipients):</strong></p>
             <code class="text-xs bg-gray-700 px-3 py-2 rounded block overflow-x-auto">
-                curl -X POST https://wattcoin-production-81a7.up.railway.app/api/v1/scrape \<br>
+                curl -X POST https://api.wattcoin.org/api/v1/scrape \<br>
                 &nbsp;&nbsp;-H "X-API-Key: your-key-here" \<br>
                 &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
                 &nbsp;&nbsp;-d '{"url": "https://example.com", "format": "text"}'
@@ -3049,6 +3065,37 @@ def clear_payment_queue():
     print(f"[ADMIN] Cleared {pending_count} pending payments from queue", flush=True)
     
     return redirect(url_for('admin.dashboard', message=f"🗑️ Cleared {pending_count} pending payment(s) from queue"))
+
+@admin_bp.route('/close_pr/<int:pr_number>', methods=['POST'])
+@login_required
+def close_pr_route(pr_number):
+    """Close a single open PR from admin dashboard."""
+    success = close_pr(pr_number)
+    if success:
+        print(f"[ADMIN] Closed PR #{pr_number} from dashboard", flush=True)
+        return redirect(url_for('admin.dashboard', message=f"✅ Closed PR #{pr_number}"))
+    else:
+        return redirect(url_for('admin.dashboard', error=f"❌ Failed to close PR #{pr_number}"))
+
+@admin_bp.route('/close_all_prs', methods=['POST'])
+@login_required
+def close_all_prs():
+    """Close all open PRs from admin dashboard."""
+    prs = get_open_prs()
+    closed = []
+    failed = []
+    for pr in prs:
+        num = pr.get("number")
+        if close_pr(num):
+            closed.append(num)
+        else:
+            failed.append(num)
+    
+    print(f"[ADMIN] Bulk closed PRs: {closed}, failed: {failed}", flush=True)
+    
+    if failed:
+        return redirect(url_for('admin.dashboard', error=f"Closed {len(closed)} PRs, failed: {failed}"))
+    return redirect(url_for('admin.dashboard', message=f"✅ Closed {len(closed)} open PR(s)"))
 
 
 def reject_submission(sub_id):

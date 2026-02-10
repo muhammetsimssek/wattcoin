@@ -151,7 +151,7 @@ python wattnode.py status
 
 View live network nodes:
 ```bash
-curl https://wattcoin-production-81a7.up.railway.app/api/v1/nodes
+curl https://api.wattcoin.org/api/v1/nodes
 ```
 
 ## Troubleshooting

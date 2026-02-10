@@ -42,7 +42,7 @@ Test endpoints:
 
 ```bash
 # System info
-curl https://wattcoin-production-81a7.up.railway.app/api/v1/wsi/info
+curl https://api.wattcoin.org/api/v1/wsi/info
 
 # Should return:
 # {"system": "WattCoin SuperIntelligence (WSI)", ...}
@@ -112,7 +112,7 @@ Upload `wsi_chat.html` to:
 
 **Query stats:**
 ```bash
-curl https://wattcoin-production-81a7.up.railway.app/api/v1/wsi/info
+curl https://api.wattcoin.org/api/v1/wsi/info
 # Check: total_queries, queries_24h
 ```
 
