@@ -1,4 +1,5 @@
 import aiohttp
+from aiohttp import ClientTimeout
 import logging
 from config import WATTCOIN_API_URL, WATT_MINT_ADDRESS
 
@@ -10,9 +11,11 @@ class WattCoinAPI:
 
     async def _make_request(self, endpoint):
         url = f"{self.base_url}/{endpoint}"
+        # ✅ FIXED: aiohttp timeout requires ClientTimeout object
+        timeout = ClientTimeout(total=10)
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=10) as resp:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as resp:
                     if resp.status != 200:
                         logger.error(f"API request to {url} failed with status {resp.status}")
                         return None
@@ -39,8 +42,8 @@ class WattCoinAPI:
 
     async def get_alerts(self):
         """
-        Polls multiple endpoints to synthesize an 'activity' feed.
-        Since /recent-activity doesn't exist, we'll check /bounties for now.
+        Polls the /bounties endpoint to synthesize an activity feed
+        for the alerts channel.
         """
         bounties = await self.get_bounties()
         if not bounties:
@@ -60,9 +63,10 @@ class WattCoinAPI:
 class DexScreenerAPI:
     async def get_price(self):
         url = f"https://api.dexscreener.com/latest/dex/tokens/{WATT_MINT_ADDRESS}"
+        timeout = ClientTimeout(total=10)
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=10) as resp:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as resp:
                     if resp.status != 200:
                         logger.error(f"DexScreener request failed with status {resp.status}")
                         return None

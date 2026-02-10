@@ -23,7 +23,7 @@ class WattCoinCommands(commands.Cog):
         # Validate Solana address
         try:
             Pubkey.from_string(address)
-        except ValueError:
+        except Exception:
             await interaction.followup.send("❌ Invalid Solana address format. Please provide a valid public key.", ephemeral=True)
             return
 
