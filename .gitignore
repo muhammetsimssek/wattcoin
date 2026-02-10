@@ -1,5 +1,43 @@
+# .gitignore - Refined for WattCoin Production
+# ------------------------------------------
+
+# Environment variables
 .env
-*.pyc
+.env.*
+!.env.example
+*.secret
+*.key
+
+# Logs
+logs/
+*.log
+
+# Python
 __pycache__/
-conversation_log.json
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Production configs (DO NOT COMMIT)
+config/production.json
+config/secrets.yaml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
