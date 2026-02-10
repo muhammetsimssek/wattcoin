@@ -10,8 +10,15 @@ logger = logging.getLogger(__name__)
 class SolanaWattClient:
     def __init__(self, rpc_url: str, mint_address: str):
         self.rpc_url = rpc_url
-        self.mint_address = Pubkey.from_string(mint_address)
         self.timeout = 10.0 # seconds
+        
+        # ✅ FIXED: Initialize mint address as Pubkey object
+        try:
+            self.mint_address = Pubkey.from_string(mint_address)
+            logger.info(f"Solana client initialized for mint: {mint_address}")
+        except Exception as e:
+            logger.error(f"Invalid mint address {mint_address}: {e}")
+            raise ValueError(f"Invalid WATT token mint address: {mint_address}")
 
     async def get_watt_balance(self, wallet_address: str) -> float:
         """
@@ -33,7 +40,7 @@ class SolanaWattClient:
                 # Admin feedback: TokenAccountOpts must be object
                 opts = TokenAccountOpts(mint=self.mint_address)
                 
-                # asyncio.wait_for for extra safety
+                # asyncio.wait_for for extra safety layer
                 response = await asyncio.wait_for(
                     client.get_token_accounts_by_owner(owner_pubkey, opts),
                     timeout=self.timeout

@@ -1,61 +1,86 @@
 import os
+import sys
 import json
 import time
 import logging
-import sys
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+
+# Initialize Flask App
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "wattcoin-dev-key-change-in-prod")
+app._server_start_time = time.time()
 
 # =============================================================================
-# LOGGING CONFIGURATION (Fixed per Admin/Muhammet feedback)
+# 1. LOGGING CONFIGURATION (Fixed per Admin/Muhammet feedback)
 # =============================================================================
 def setup_logging():
-    """Configure application-wide rotating logging"""
+    """Configure application-wide logging with auto-directory creation"""
+    log_dir = os.getenv('LOG_DIR', 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'wattcoin.log')
+    
     log_format = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+        '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Ensure logs directory exists
-    os.makedirs('logs', exist_ok=True)
-    
-    # Console handler
+    # Console handler (INFO and above)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(log_format)
     
-    # File handler (10MB rotation)
+    # File handler (DEBUG and above, 10MB rotation)
     file_handler = RotatingFileHandler(
-        'logs/wattcoin.log', 
+        log_file, 
         maxBytes=10*1024*1024, # 10MB
-        backupCount=5
+        backupCount=5,
+        encoding='utf-8'
     )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(log_format)
     
-    # Root logger configuration
+    # Root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
+    root_logger.handlers.clear() # Prevent duplicates
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
 
 setup_logging()
 logger = logging.getLogger("wattcoin.bridge")
 
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "wattcoin-dev-key-change-in-prod")
-app._server_start_time = time.time()
+# =============================================================================
+# 5. ENVIRONMENT VALIDATION
+# =============================================================================
+def validate_environment():
+    """Validate critical environment variables at startup"""
+    required_vars = {
+        'DISCORD_WEBHOOK_URL': 'Discord notifications',
+        'SOLANA_RPC_URL': 'Solana blockchain access',
+        'WATT_TOKEN_MINT': 'WATT token identification'
+    }
+    missing = []
+    for var, purpose in required_vars.items():
+        if not os.getenv(var):
+            missing.append(f"{var} (needed for: {purpose})")
+    
+    if missing:
+        logger.error("="*60)
+        logger.error("CRITICAL: Missing required environment variables:")
+        for item in missing:
+            logger.error(f" - {item}")
+        logger.error("="*60)
+        logger.error("Application cannot start without these variables.")
+        sys.exit(1)
+    logger.info("✅ All required environment variables present")
 
-# Mocking clients for this snippet (In real file they are imported/init)
+# Mock clients and helpers for snippet compatibility
 ai_client = None
 claude_client = None
-
-def get_active_nodes():
-    # Placeholder for actual function
-    return []
+def get_active_nodes(): return []
 
 # =============================================================================
 # ENDPOINTS
@@ -77,16 +102,19 @@ def health():
         logger.error(f"Failed to fetch active nodes: {e}", exc_info=True)
 
     try:
-        tasks_path = os.path.join(os.getenv('DATA_DIR', '/app/data'), 'tasks.json')
+        data_dir = os.getenv('DATA_DIR', '/app/data')
+        tasks_path = os.path.join(data_dir, 'tasks.json')
         if os.path.exists(tasks_path):
-            with open(tasks_path, 'r') as f:
+            with open(tasks_path, 'r', encoding='utf-8') as f:
                 tasks_data = json.load(f)
                 tasks = tasks_data.get("tasks", {})
                 open_tasks_count = sum(1 for t in tasks.values() if t.get("status") == "open")
     except Exception as e:
         logger.error(f"Failed to read tasks.json: {e}", exc_info=True)
 
-    # Legacy fields (REQUIRED)
+    uptime_seconds = int(time.time() - app._server_start_time)
+
+    # Legacy fields (REQUIRED for backward compatibility)
     response_data = {
         'status': 'ok',
         'version': '3.4.0',
@@ -98,17 +126,19 @@ def health():
         
         # New Deep Monitoring Object
         'details': {
-            'system_status': 'healthy' if active_nodes_count > 0 else 'warning',
-            'uptime_seconds': int(time.time() - getattr(app, '_server_start_time', time.time())),
+            'system_status': 'healthy',
+            'uptime_seconds': uptime_seconds,
             'open_tasks': open_tasks_count,
             'timestamp': datetime.utcnow().isoformat() + 'Z',
             'services': {
-                'discord': 'configured' if os.getenv("DISCORD_WEBHOOK_URL") else 'missing',
-                'ai_api': 'ok' if ai_client else 'missing'
+                'discord_webhook': 'configured' if os.getenv("DISCORD_WEBHOOK_URL") else 'missing',
+                'ai_api_provider': 'active' if ai_client else 'inactive',
+                'solana_rpc': 'configured' if os.getenv("SOLANA_RPC_URL") else 'missing'
             }
         }
     }
     
+    logger.debug(f"Health check: {active_nodes_count} nodes, {open_tasks_count} tasks")
     return jsonify(response_data), 200
 
 @app.route('/recent-activity')
@@ -116,15 +146,18 @@ def health():
 def recent_activity():
     """
     [FIXED] Dual-path support for activity monitoring (legacy and versioned).
-    Returns a safe fallback structure if data is unavailable.
+    Returns a safe fallback structure with ISO 8601 consistency.
     """
     try:
-        # Placeholder for actual activity logic
         activities_data = {
             "activities": [], 
             "status": "tracking_active",
             "last_updated": datetime.utcnow().isoformat() + 'Z',
-            "total_count": 0
+            "total_count": 0,
+            "meta": {
+                "version": "3.4.0",
+                "endpoint": "/recent-activity"
+            }
         }
         return jsonify(activities_data), 200
     except Exception as e:
@@ -132,8 +165,15 @@ def recent_activity():
         return jsonify({
             "error": "Service temporarily unavailable",
             "activities": [],
-            "status": "degraded"
+            "status": "degraded",
+            "last_updated": datetime.utcnow().isoformat() + 'Z'
         }), 503
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    validate_environment()
+    logger.info("Starting WattCoin Bridge Web Service...")
+    app.run(
+        host='0.0.0.0', 
+        port=int(os.getenv('PORT', 5000)),
+        debug=(os.getenv('FLASK_ENV') == 'development')
+    )

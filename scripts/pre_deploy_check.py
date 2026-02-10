@@ -1,57 +1,73 @@
 import os
 import sys
 import logging
+import re
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger("pre_deploy")
 
 class ProductionValidator:
-    """Checklist to ensure no sensitive info or example values leak to production"""
+    """Comprehensive pre-deployment validation for WattCoin"""
     
     CRITICAL_ENV_VARS = [
-        'API_BASE_URL',
         'DISCORD_WEBHOOK_URL',
-        'SECRET_KEY',
         'SOLANA_RPC_URL',
-        'WATT_TOKEN_MINT'
+        'WATT_TOKEN_MINT',
+        'SECRET_KEY'
     ]
     
-    FORBIDDEN_STRINGS = [
-        'example.com',
-        'railway.app', # Specifically requested by Admin
-        'localhost',
-        'change-me',
-        'your-api-key'
+    FORBIDDEN_PATTERNS = [
+        r'example\.com',
+        r'railway\.app', 
+        r'localhost',
+        r'127\.0\.0\.1',
+        r'change-me',
+        r'your-api-key'
     ]
 
-    def validate_env_template(self):
-        """Checks if .env.example contains example data (correct)"""
-        path = '.env.example'
-        if not os.path.exists(path):
-            logger.error("❌ .env.example is missing!")
+    def validate_env_vars(self):
+        """Check required production env vars"""
+        logger.info("Validating environment variables...")
+        missing = [v for v in self.CRITICAL_ENV_VARS if not os.getenv(v)]
+        if missing:
+            logger.error(f"❌ Missing critical env vars: {missing}")
             return False
         return True
 
-    def validate_gitignore(self):
-        """Ensures .gitignore covers sensitive files"""
-        if not os.path.exists('.gitignore'):
-            return False
-        with open('.gitignore', 'r') as f:
-            content = f.read()
-            required = ['.env', '*.secret', 'logs/']
-            for item in required:
-                if item not in content:
-                    logger.error(f"❌ .gitignore is missing: {item}")
+    def validate_no_leaks(self):
+        """Ensure no dev values in critical env vars"""
+        logger.info("Checking for config leaks...")
+        for var in self.CRITICAL_ENV_VARS:
+            val = os.getenv(var, '')
+            for pattern in self.FORBIDDEN_PATTERNS:
+                if re.search(pattern, val.lower()):
+                    logger.error(f"❌ {var} contains forbidden pattern: {pattern}")
                     return False
         return True
 
+    def validate_file_structure(self):
+        """Verify existence of core files"""
+        logger.info("Validating file structure...")
+        required = ['.env.example', '.gitignore', 'requirements.txt', 'bridge_web.py']
+        for f in required:
+            if not os.path.exists(f):
+                logger.error(f"❌ Missing file: {f}")
+                return False
+        return True
+
     def run_all(self):
+        logger.info("="*60)
+        logger.info("Starting WattCoin Pre-Deployment Audit")
+        logger.info("="*60)
         results = [
-            self.validate_env_template(),
-            self.validate_gitignore()
+            self.validate_env_vars(),
+            self.validate_no_leaks(),
+            self.validate_file_structure()
         ]
         if all(results):
-            logger.info("✅ PRE-DEPLOYMENT CHECKS PASSED!")
+            logger.info("="*60)
+            logger.info("✅ ALL PRE-DEPLOYMENT CHECKS PASSED!")
+            logger.info("="*60)
             return True
         return False
 

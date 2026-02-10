@@ -1,14 +1,25 @@
-anthropic>=0.39.0
-openai>=1.50.0
-flask>=3.0.0
-flask-cors>=4.0.0
-flask-session>=0.5.0
-flask-limiter>=3.5.0
-requests>=2.31.0
-redis>=5.0.0
-beautifulsoup4>=4.12.3
-pytest>=8.0.0
-# Solana for auto-payout
-solana>=0.30.0
-solders>=0.18.0
-base58>=2.1.0
+# requirements.txt - Pinned Versions for Production
+# -----------------------------------------------
+
+# Web Framework
+Flask==3.0.0
+gunicorn==21.2.0
+
+# Solana Integration
+solana==0.30.2
+solders==0.18.1
+asyncio==3.4.3
+
+# API Clients
+requests==2.31.0
+aiohttp==3.9.1
+
+# Utilities
+python-dotenv==1.0.0
+python-json-logger==2.0.7
+beautifulsoup4==4.12.2
+
+# Testing (development only)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
